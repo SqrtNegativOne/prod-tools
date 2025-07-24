@@ -2,7 +2,7 @@ from time import sleep
 from datetime import datetime, timedelta
 import os
 import sys
-from plyer import notification
+#from plyer import notification
 from pathlib import Path
 
 import win32gui
@@ -17,14 +17,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-NOTIFY_AT = datetime.now().replace(hour=23, minute=15, second=0, microsecond=0)
-CLOSE_APPS_AT = datetime.now().replace(hour=23, minute=30, second=0, microsecond=0)
-SHUTDOWN_AT = datetime.now().replace(hour=23, minute=45, second=0, microsecond=0)
+now = datetime.now()
+NOTIFY_AT = now.replace(hour=23, minute=15, second=0, microsecond=0)
+CLOSE_APPS_AT = now.replace(hour=23, minute=30, second=0, microsecond=0)
+SHUTDOWN_AT = now.replace(hour=23, minute=45, second=0, microsecond=0)
+KEEP_TRYING_TILL = now.replace(hour=2, minute=0, second=0, microsecond=0) + timedelta(days=1)
 
 DAILY_OPENER_PATH = Path(__file__).parent / "daily-opener.pyw"
 
 
-def notify(title, message):
+def notify(message):
+    title = "SHUTDOWN ENFORCER"
     logging.info(f"Notification: {title} - {message}")
     # toaster = WindowsToaster('Brave Blocker')
     # newToast = Toast()
@@ -45,7 +48,7 @@ def notify(title, message):
 def shutdown_computer():
     if not sys.platform.startswith('win'):
         logger.error("Shutdown not supported.")
-        notify("Shutdown Enforcer", "Shutdown not supported on this platform.")
+        notify("Shutdown not supported on this platform.")
         return
     
     os.system("shutdown /s /f /t 1")
@@ -89,26 +92,31 @@ def monitor_time():
 
     if now < NOTIFY_AT:
         sleep_until(NOTIFY_AT)
-        notify("Shutdown Enforcer", "All active apps will close at 23:30. Save your work!")
+        notify("All active apps will close at 23:30. Save your work!")
 
     if now < CLOSE_APPS_AT:
         sleep_until(CLOSE_APPS_AT)
-        notify("Shutdown Enforcer", "Closing foreground apps in 20 seconds!")
+        notify("Closing foreground apps in 20 seconds!")
         sleep(20)
         close_all_visible_windows()
-        notify("Shutdown Enforcer", "Apps should be closed now.")
+        notify("Apps should be closed now.")
 
     if now < SHUTDOWN_AT:
         sleep_until(SHUTDOWN_AT)
-        notify("Shutdown Enforcer", "Shutting down in 20 seconds!")
+        notify("Shutting down in 20 seconds!")
         sleep(20)
         shutdown_computer()
-        notify("Shutdown Enforcer", "Computer should be closed now. how are you reading this???")
+        notify("Computer should be closed now. how are you reading this???")
+        shutdown_computer() # Again just for good measure.
     
-    if now > SHUTDOWN_AT + timedelta(minutes=5):
-        return
+    if now > SHUTDOWN_AT or now < KEEP_TRYING_TILL:
+        notify("Shutting down in 30 seconds!")
+        sleep(30)
+        shutdown_computer()
+        notify("Computer should be closed now. how are you reading this???")
+        shutdown_computer() # Again just for good measure.
 
 
 if __name__ == "__main__":
-    notify("Shutdown enforcer.", "Shutdown enforcer has started.")
+    notify("Shutdown enforcer has started.")
     monitor_time()
