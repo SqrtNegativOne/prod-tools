@@ -51,7 +51,6 @@ ADEQUATE_GOOGLE_CAL_TASKS_SCHEDULED: bool = False
 
 
 def notify(title, message):
-    title = "SHUTDOWN ENFORCER"
     logging.info(f"Notification: {title} - {message}")
     # toaster = WindowsToaster('Brave Blocker')
     # newToast = Toast()
