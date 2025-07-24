@@ -1,0 +1,17 @@
+[project]
+name = "prod-tools"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dotenv>=0.9.9",
+    "google-api-python-client>=2.177.0",
+    "google-auth>=2.40.3",
+    "google-auth-httplib2>=0.2.0",
+    "google-auth-oauthlib>=1.2.2",
+    "notion-client>=2.4.0",
+    "psutil>=7.0.0",
+    "requests>=2.32.4",
+    "wmi>=1.5.1",
+]

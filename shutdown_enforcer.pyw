@@ -21,7 +21,7 @@ now = datetime.now()
 NOTIFY_AT = now.replace(hour=23, minute=15, second=0, microsecond=0)
 CLOSE_APPS_AT = now.replace(hour=23, minute=30, second=0, microsecond=0)
 SHUTDOWN_AT = now.replace(hour=23, minute=45, second=0, microsecond=0)
-KEEP_TRYING_TILL = now.replace(hour=2, minute=0, second=0, microsecond=0) + timedelta(days=1)
+KEEP_TRYING_TILL = now.replace(hour=3, minute=0, second=0, microsecond=0) + timedelta(days=1)
 
 DAILY_OPENER_PATH = Path(__file__).parent / "daily-opener.pyw"
 
@@ -107,14 +107,18 @@ def monitor_time():
         sleep(20)
         shutdown_computer()
         notify("Computer should be closed now. how are you reading this???")
-        shutdown_computer() # Again just for good measure.
+        while True:
+            notify("Shutting down again!")
+            shutdown_computer()
     
-    if now > SHUTDOWN_AT or now < KEEP_TRYING_TILL:
+    if SHUTDOWN_AT <= now < KEEP_TRYING_TILL:
         notify("Shutting down in 30 seconds!")
         sleep(30)
         shutdown_computer()
         notify("Computer should be closed now. how are you reading this???")
-        shutdown_computer() # Again just for good measure.
+        while True:
+            notify("Shutting down again!")
+            shutdown_computer() # Again just for good measure.
 
 
 if __name__ == "__main__":

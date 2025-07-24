@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pythoncom
 
-from windows_toasts import WindowsToaster, Toast
+#from windows_toasts import WindowsToaster, Toast
+import tkinter
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -49,13 +50,24 @@ ALL_NOTION_TASKS_SORTED: bool = False
 ADEQUATE_GOOGLE_CAL_TASKS_SCHEDULED: bool = False
 
 
-def notify(title: str, message: str):
+def notify(title, message):
+    title = "SHUTDOWN ENFORCER"
     logging.info(f"Notification: {title} - {message}")
-    toaster = WindowsToaster('Brave Blocker')
-    newToast = Toast()
-    newToast.text_fields = [title, message]
-    toaster.show_toast(newToast)
-    sleep(0.1)
+    # toaster = WindowsToaster('Brave Blocker')
+    # newToast = Toast()
+    # newToast.text_fields = [title, message]
+    # toaster.show_toast(newToast)
+
+    # Show a tkinter window with the notice for 2 seconds
+    root = tkinter.Tk()
+    root.title(title)
+    root.geometry("350x100")
+    root.attributes("-topmost", True)
+    root.resizable(False, False)
+    label = tkinter.Label(root, text=message, font=("Segoe UI", 16), wraplength=320, justify="center")
+    label.pack(expand=True, fill="both", padx=10, pady=10)
+    root.after(1000, root.destroy)
+    root.mainloop()
 
 def no_notion_tasks_to_sort() -> bool:
     if ALL_NOTION_TASKS_SORTED: # Means we have already checked this before; no need to make another API call
