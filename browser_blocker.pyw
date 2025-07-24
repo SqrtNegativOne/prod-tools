@@ -220,26 +220,24 @@ def monitor_brave():
         pid = process_detected.ProcessId
         try:
             p = psutil.Process(pid)
+            parent = p.parent()
+            if parent and parent.name().lower() == 'brave.exe':
+                logging.info("Child brave process detected. Ignoring.")
+                # If you kill the child, the parent will simply spawn a new one. Like Hydra.
+                continue
+            logging.info("Parent brave process detected.")
+
+            sys_exit_if_requirements_fulfilled()
+
+            logging.info("Requirements not satisfied, killing Brave process.")
+            p.kill()
         except psutil.NoSuchProcess:
             logging.error(f"Process with PID {pid} no longer exists.")
             continue
         except psutil.AccessDenied:
             logging.error(f"Access denied when trying to kill Brave process {pid}.")
             continue
-        
-        parent = p.parent()
-        if parent and parent.name().lower() == 'brave.exe':
-            logging.info("Child brave process detected. Ignoring.")
-            # If you kill the child, the parent will simply spawn a new one. Like Hydra.
-            continue
-
-        logging.info("Parent brave process detected.")
-
-        sys_exit_if_requirements_fulfilled()
-
-        logging.info("Requirements not satisfied, killing Brave process.")
-
-        p.kill()
+    
         sleep(1)
 
 if __name__ == '__main__':
