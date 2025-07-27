@@ -20,10 +20,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from loguru import logger
+logger.add('out.log')
 
 GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
 DONT_TRY_BEFORE_THIS_HOUR =  6 # 24 hour time format
@@ -51,7 +49,7 @@ ADEQUATE_GOOGLE_CAL_TASKS_SCHEDULED: bool = False
 
 
 def notify(title, message):
-    logging.info(f"Notification: {title} - {message}")
+    logger.info(f"Notification: {title} - {message}")
     # toaster = WindowsToaster('Brave Blocker')
     # newToast = Toast()
     # newToast.text_fields = [title, message]
@@ -65,7 +63,7 @@ def notify(title, message):
     root.resizable(False, False)
     label = tkinter.Label(root, text=message, font=("Segoe UI", 16), wraplength=320, justify="center")
     label.pack(expand=True, fill="both", padx=10, pady=10)
-    root.after(1000, root.destroy)
+    root.after(2000, root.destroy)
     root.mainloop()
 
 def no_notion_tasks_to_sort() -> bool:
@@ -174,7 +172,7 @@ def adequate_google_cal_tasks_scheduled() -> bool:
     items_count = 0
     for calendar_id in calendar_ids:
         items_count += fetch_num_calendar_items_for_one_calendar(service, calendar_id)
-        logging.info(f"Calendar ID: {calendar_id}, Items Count: {items_count}")
+        logger.info(f"Calendar ID: {calendar_id}, Items Count: {items_count}")
         if items_count >= CAL_ITEMS_REQUIRED:
             return True
     
@@ -207,7 +205,7 @@ def monitor_brave():
     c = wmi.WMI()
     watcher = c.Win32_Process.watch_for("creation")
 
-    logging.info("Monitoring process creation.")
+    logger.info("Monitoring process creation.")
 
     while True:
         process_detected = watcher()
@@ -221,20 +219,20 @@ def monitor_brave():
             p = psutil.Process(pid)
             parent = p.parent()
             if parent and parent.name().lower() == 'brave.exe':
-                logging.info("Child brave process detected. Ignoring.")
+                logger.info("Child brave process detected. Ignoring.")
                 # If you kill the child, the parent will simply spawn a new one. Like Hydra.
                 continue
-            logging.info("Parent brave process detected.")
+            logger.info("Parent brave process detected.")
 
             sys_exit_if_requirements_fulfilled()
 
-            logging.info("Requirements not satisfied, killing Brave process.")
+            logger.info("Requirements not satisfied, killing Brave process.")
             p.kill()
         except psutil.NoSuchProcess:
-            logging.error(f"Process with PID {pid} no longer exists.")
+            logger.error(f"Process with PID {pid} no longer exists.")
             continue
         except psutil.AccessDenied:
-            logging.error(f"Access denied when trying to kill Brave process {pid}.")
+            logger.error(f"Access denied when trying to kill Brave process {pid}.")
             continue
     
         sleep(1)

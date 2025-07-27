@@ -12,9 +12,8 @@ import psutil
 # from windows_toasts import WindowsToaster, Toast
 import tkinter
 
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from loguru import logger
+logger.add('out.log')
 
 
 now = datetime.now()
@@ -28,7 +27,7 @@ DAILY_OPENER_PATH = Path(__file__).parent / "daily-opener.pyw"
 
 def notify(message):
     title = "SHUTDOWN ENFORCER"
-    logging.info(f"Notification: {title} - {message}")
+    logger.info(f"Notification: {title} - {message}")
     # toaster = WindowsToaster('Brave Blocker')
     # newToast = Toast()
     # newToast.text_fields = [title, message]
@@ -82,7 +81,7 @@ def close_all_visible_windows():
             return
 
         # Attempt to close the window
-        logging.info(f"Closing window '{window_title}' from process '{proc.name()}' (PID: {pid})")
+        logger.info(f"Closing window '{window_title}' from process '{proc.name()}' (PID: {pid})")
         win32gui.PostMessage(hwnd, 0x0010, 0, 0)  # WM_CLOSE
 
     win32gui.EnumWindows(enum_window_callback, None)
