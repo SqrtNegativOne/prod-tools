@@ -3,8 +3,7 @@ from notion_client import Client
 import webbrowser
 from dotenv import load_dotenv
 
-from loguru import logger
-logger.add('out.log')
+from config import logger
 
 def get_latest_journal_page_id():
     NOTION_KEY = os.getenv("NOTION_KEY")

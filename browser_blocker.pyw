@@ -20,8 +20,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from loguru import logger
-logger.add('out.log')
+from config import logger
 
 GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
 DONT_TRY_BEFORE_THIS_HOUR =  6 # 24 hour time format
@@ -42,7 +41,8 @@ TODAY = datetime.now(timezone.utc).date()
 TODAY_START = datetime.combine(TODAY, time.min, tzinfo=timezone.utc).isoformat()
 TODAY_END = datetime.combine(TODAY, time.max, tzinfo=timezone.utc).isoformat()
 
-DEBUG_MODE: bool = True # Set to False in production
+DEBUG_MODE: bool = False # Set to False in production
+
 
 ALL_NOTION_TASKS_SORTED: bool = False
 ADEQUATE_GOOGLE_CAL_TASKS_SCHEDULED: bool = False
@@ -229,10 +229,8 @@ def monitor_brave():
             logger.info("Requirements not satisfied, killing Brave process.")
             p.kill()
         except psutil.NoSuchProcess:
-            logger.error(f"Process with PID {pid} no longer exists.")
             continue
         except psutil.AccessDenied:
-            logger.error(f"Access denied when trying to kill Brave process {pid}.")
             continue
     
         sleep(1)

@@ -12,8 +12,7 @@ import psutil
 # from windows_toasts import WindowsToaster, Toast
 import tkinter
 
-from loguru import logger
-logger.add('out.log')
+from config import logger
 
 
 now = datetime.now()
