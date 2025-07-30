@@ -4,7 +4,7 @@ import sys
 import psutil
 import wmi
 import threading
-from datetime import datetime, timezone, time
+from datetime import datetime, time
 from time import sleep
 from notion_client import Client
 from pathlib import Path
@@ -22,24 +22,29 @@ from googleapiclient.errors import HttpError
 
 from config import logger
 
-GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
-DONT_TRY_BEFORE_THIS_HOUR =  6 # 24 hour time format
-CAL_ITEMS_REQUIRED = 5
+# GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
+# DONT_TRY_BEFORE_THIS_HOUR =  6 # 24 hour time format
+CAL_ITEMS_REQUIRED = 3
 
 BASE_DIR = Path(__file__).parent
 ENV_PATH = BASE_DIR / ".env"
-SECRETS_DIR = BASE_DIR / "secrets"
+SECRETS_DIR = BASE_DIR.parent / "secrets"
 CREDENTIALS_PATH = SECRETS_DIR / "credentials.json"
 TOKENS_PATH = SECRETS_DIR / "token.json"
 
+LAST_TIME_OPENED_FILE_PATH = BASE_DIR.parent / 'log' / 'last.txt'
+
 load_dotenv(ENV_PATH)
+CALENDAR_ID: str = os.getenv('CALENDAR_ID', '')
+if not CALENDAR_ID:
+    raise ValueError
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
-TODAY = datetime.now(timezone.utc).date()
-TODAY_START = datetime.combine(TODAY, time.min, tzinfo=timezone.utc).isoformat()
-TODAY_END = datetime.combine(TODAY, time.max, tzinfo=timezone.utc).isoformat()
+TODAY = datetime.now().date()
+TODAY_START = datetime.combine(TODAY, time.min).isoformat()
+TODAY_END = datetime.combine(TODAY, time.max).isoformat()
 
 DEBUG_MODE: bool = False # Set to False in production
 
@@ -166,15 +171,16 @@ def adequate_google_cal_tasks_scheduled() -> bool:
     # Else, we have to check.
 
     service = build('calendar', 'v3', credentials=get_credentials())
-    calendar_list = service.calendarList().list().execute()
-    calendar_ids = [calendar['id'] for calendar in calendar_list.get('items', [])]
+    items_count = fetch_num_calendar_items_for_one_calendar(service, CALENDAR_ID)
+    # calendar_list = service.calendarList().list().execute()
+    # calendar_ids = [calendar['id'] for calendar in calendar_list.get('items', [])]
 
-    items_count = 0
-    for calendar_id in calendar_ids:
-        items_count += fetch_num_calendar_items_for_one_calendar(service, calendar_id)
-        logger.info(f"Calendar ID: {calendar_id}, Items Count: {items_count}")
-        if items_count >= CAL_ITEMS_REQUIRED:
-            return True
+    # items_count = 0
+    # for calendar_id in calendar_ids:
+    #     items_count += fetch_num_calendar_items_for_one_calendar(service, calendar_id)
+    #     logger.info(f"Calendar ID: {calendar_id}, Items Count: {items_count}")
+    #     if items_count >= CAL_ITEMS_REQUIRED:
+    #         return True
     
     notify(
         title="Schedule tasks in Google Calendar",
@@ -182,14 +188,36 @@ def adequate_google_cal_tasks_scheduled() -> bool:
     )
     return False
 
+def save_time() -> None:
+    now = datetime.now()
+    formatted = now.strftime("%Y-%m-%d %H")
+    
+    with open(LAST_TIME_OPENED_FILE_PATH, 'w') as f:
+        f.writelines(formatted)
+
+def first_time_in_day_running_script() -> bool:
+    if not LAST_TIME_OPENED_FILE_PATH.exists:
+        save_time()
+
+    with open(LAST_TIME_OPENED_FILE_PATH, 'r') as f:
+        time_string = f.readline()
+    
+    save_time()
+
+    # Check time; TODO
+
+    return True
+
+
+
 def sys_exit_if_requirements_fulfilled() -> None:
-    current_hour: int = datetime.now().hour
-    if not DEBUG_MODE and current_hour in range(GIVE_UP_AFTER_THIS_HOUR, DONT_TRY_BEFORE_THIS_HOUR):
-        notify(
-            title="It's late anyway.",
-            message="You can use Brave.",
-        )
-        sys.exit(0)
+    # current_hour: int = datetime.now().hour
+    # if not DEBUG_MODE and current_hour in range(GIVE_UP_AFTER_THIS_HOUR, DONT_TRY_BEFORE_THIS_HOUR):
+    #     notify(
+    #         title="It's late anyway.",
+    #         message="You can use Brave.",
+    #     )
+    #     sys.exit(0)
 
     requirements = [
         no_notion_tasks_to_sort,
@@ -197,6 +225,7 @@ def sys_exit_if_requirements_fulfilled() -> None:
     ]
 
     if all(req() for req in requirements):
+        logger.info('Quitting browser blocker.')
         sys.exit(0)
 
 def monitor_brave():
