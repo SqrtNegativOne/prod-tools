@@ -3,4 +3,3 @@ Set-Location $scriptPath
 
 Start-Process ".\.venv\Scripts\pythonw.exe" ".\src\browser_blocker.pyw" -WindowStyle Hidden
 Start-Process ".\.venv\Scripts\pythonw.exe" ".\src\shutdown_enforcer.pyw" -WindowStyle Hidden
-Start-Process ".\.venv\Scripts\pythonw.exe" ".\src\daily_opener.pyw" -WindowStyle Hidden
