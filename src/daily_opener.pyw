@@ -3,7 +3,10 @@ from notion_client import Client
 import webbrowser
 from dotenv import load_dotenv
 
-from config import logger
+from pathlib import Path
+from loguru import logger
+LOG_PATH = Path(__file__).parent.parent / 'log' / 'daily_opener.log'
+logger.add(LOG_PATH)
 
 def get_latest_journal_page_id():
     NOTION_KEY = os.getenv("NOTION_KEY")

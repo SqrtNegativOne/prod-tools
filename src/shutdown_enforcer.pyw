@@ -11,7 +11,9 @@ import psutil
 # from windows_toasts import WindowsToaster, Toast
 import tkinter
 
-from config import logger
+from loguru import logger
+LOG_PATH = Path(__file__).parent.parent / 'log' / 'shutdown_enforcer.log'
+logger.add(LOG_PATH)
 
 NOTIFY_AT_HOUR = 23; NOTIFY_AT_MIN = 15 # 24 hour format
 
@@ -87,6 +89,9 @@ def main():
 
     now = datetime.now()
     NOTIFY_AT = now.replace(hour=NOTIFY_AT_HOUR, minute=NOTIFY_AT_MIN, second=0, microsecond=0)
+    logger.info(f"Time now: {now.isoformat()}")
+    logger.info(f"Notify target: {NOTIFY_AT.isoformat()}")
+
     SECONDS_BEFORE_NOTIF: int = int((NOTIFY_AT - now).total_seconds())
 
     if SECONDS_BEFORE_NOTIF <= 0:

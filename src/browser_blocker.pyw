@@ -20,7 +20,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from config import logger
+from loguru import logger
+LOG_PATH = Path(__file__).parent.parent / 'log' / 'browser_blocker.log'
+logger.add(LOG_PATH)
 
 # GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
 # DONT_TRY_BEFORE_THIS_HOUR =  6 # 24 hour time format
