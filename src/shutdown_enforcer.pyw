@@ -1,5 +1,5 @@
-from time import sleep
-from datetime import datetime, timezone
+from apscheduler.schedulers.background import BackgroundScheduler, BlockingScheduler
+from datetime import datetime, timedelta
 import os
 import sys
 from pathlib import Path
@@ -84,34 +84,26 @@ def close_all_foreground_windows():
 
     win32gui.EnumWindows(enum_window_callback, None)
 
-def main():
-    notify(f"Shutdown scheduled for {NOTIFY_AT_HOUR}:{NOTIFY_AT_MIN}.")
+def schedule_tasks():
+    scheduler = BlockingScheduler(timezone="UTC")
 
     now = datetime.now()
-    NOTIFY_AT = now.replace(hour=NOTIFY_AT_HOUR, minute=NOTIFY_AT_MIN, second=0, microsecond=0)
-    logger.info(f"Time now: {now.isoformat()}")
-    logger.info(f"Notify target: {NOTIFY_AT.isoformat()}")
-
-    SECONDS_BEFORE_NOTIF: int = int((NOTIFY_AT - now).total_seconds())
-
-    if SECONDS_BEFORE_NOTIF <= 0:
-        notify("It's late anyway. Giving up shutdown enforcer now.")
+    target_time = now.replace(hour=NOTIFY_AT_HOUR, minute=NOTIFY_AT_MIN, second=0, microsecond=0)
+    if target_time < now:
         return
 
-    sleep(SECONDS_BEFORE_NOTIF)
-    notify(f"All active apps will close soon in {SECONDS_BEFORE_APP_CLOSURE // 60} minutes. Save your work!")
+    scheduler.add_job(lambda: notify(f"All active apps will close soon in {SECONDS_BEFORE_APP_CLOSURE // 60} minutes. Save your work!"),
+                      'date', run_date=target_time)
 
-    sleep(SECONDS_BEFORE_APP_CLOSURE)
-    notify(f"Closing foreground apps in {ANTICIPATION_SECONDS} seconds!")
-    sleep(ANTICIPATION_SECONDS)
-    close_all_foreground_windows()
-    notify("Apps should be closed now.")
+    scheduler.add_job(lambda: [notify(f"Closing apps in {ANTICIPATION_SECONDS} seconds!"), 
+                               close_all_foreground_windows(), notify("Apps closed.")],
+                      'date', run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE))
 
-    sleep(SECONDS_BEFORE_SHUTDOWN)
-    notify(f"Shutting down in {ANTICIPATION_SECONDS} seconds!")
-    sleep(ANTICIPATION_SECONDS)
-    shutdown_computer()
+    scheduler.add_job(lambda: [notify(f"Shutting down in {ANTICIPATION_SECONDS} seconds!"),
+                               shutdown_computer()],
+                      'date', run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + SECONDS_BEFORE_SHUTDOWN))
 
+    scheduler.start()
 
 if __name__ == "__main__":
-    main()
+    schedule_tasks()

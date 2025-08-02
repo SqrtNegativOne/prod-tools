@@ -2,6 +2,6 @@ secrets
 .env
 .venv
 
-out.log
+*.log
 
 __pycache__
