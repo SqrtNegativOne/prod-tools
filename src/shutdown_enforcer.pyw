@@ -8,8 +8,6 @@ import win32gui
 import win32process
 import psutil
 
-# from windows_toasts import WindowsToaster, Toast
-
 from utils import notif
 
 from loguru import logger

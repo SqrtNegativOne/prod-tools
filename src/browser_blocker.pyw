@@ -47,6 +47,8 @@ TODAY = datetime.now().date()
 TODAY_START = datetime.combine(TODAY, time.min).isoformat()
 TODAY_END = datetime.combine(TODAY, time.max).isoformat()
 
+BROWSER_PROCESS_NAME = 'brave.exe'
+
 DEBUG_MODE: bool = False # Set to False in production
 
 
@@ -197,14 +199,6 @@ def first_time_in_day_running_script() -> bool:
 
 
 def sys_exit_if_requirements_fulfilled() -> None:
-    # current_hour: int = datetime.now().hour
-    # if not DEBUG_MODE and current_hour in range(GIVE_UP_AFTER_THIS_HOUR, DONT_TRY_BEFORE_THIS_HOUR):
-    #     notify(
-    #         title="It's late anyway.",
-    #         message="You can use Brave.",
-    #     )
-    #     sys.exit(0)
-
     requirements = [
         no_notion_tasks_to_sort,
         adequate_google_cal_tasks_scheduled
@@ -214,7 +208,7 @@ def sys_exit_if_requirements_fulfilled() -> None:
         logger.info('Quitting browser blocker.')
         sys.exit(0)
 
-def monitor_brave():
+def monitor_browser_process():
     pythoncom.CoInitialize()  # initialize COM for this thread
 
     c = wmi.WMI()
@@ -226,22 +220,22 @@ def monitor_brave():
         process_detected = watcher()
 
         name = process_detected.Caption.lower()
-        if name != 'brave.exe':
+        if name != BROWSER_PROCESS_NAME:
             continue
 
         pid = process_detected.ProcessId
         try:
             p = psutil.Process(pid)
             parent = p.parent()
-            if parent and parent.name().lower() == 'brave.exe':
-                logger.info("Child brave process detected. Ignoring.")
+            if parent and parent.name().lower() == BROWSER_PROCESS_NAME:
+                logger.info("Child browser process detected. Ignoring.")
                 # If you kill the child, the parent will simply spawn a new one. Like Hydra.
                 continue
-            logger.info("Parent brave process detected.")
+            logger.info("Parent browser process detected.")
 
             sys_exit_if_requirements_fulfilled()
 
-            logger.info("Requirements not satisfied, killing Brave process.")
+            logger.info("Requirements not satisfied: killing browser.")
             p.kill()
         except psutil.NoSuchProcess:
             continue
@@ -251,6 +245,6 @@ def monitor_brave():
         sleep(1)
 
 if __name__ == '__main__':
-    notify(title="Brave Blocker Started", message="Monitoring Brave browser process.")
-    threading.Thread(target=monitor_brave, daemon=True).start()
+    notify(title="Browser Blocker Started", message="Monitoring browser process.")
+    threading.Thread(target=monitor_browser_process, daemon=True).start()
     threading.Event().wait()  # Keep main thread alive
