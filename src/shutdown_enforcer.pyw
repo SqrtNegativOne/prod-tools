@@ -9,11 +9,14 @@ import win32process
 import psutil
 
 # from windows_toasts import WindowsToaster, Toast
-import tkinter
+
+from utils import notif
 
 from loguru import logger
 LOG_PATH = Path(__file__).parent.parent / 'log' / 'shutdown_enforcer.log'
 logger.add(LOG_PATH)
+
+WINDOW_TITLE = 'SHUTDOWN ENFORCER'
 
 NOTIFY_AT_HOUR = 23; NOTIFY_AT_MIN = 15 # 24 hour format
 
@@ -22,24 +25,8 @@ SECONDS_BEFORE_SHUTDOWN = 15 * 60
 
 ANTICIPATION_SECONDS = 20
 
-def notify(message):
-    title = "SHUTDOWN ENFORCER"
-    logger.info(f"Notification: {title} - {message}")
-    # toaster = WindowsToaster('Brave Blocker')
-    # newToast = Toast()
-    # newToast.text_fields = [title, message]
-    # toaster.show_toast(newToast)
-
-    # Show a tkinter window with the notice for 2 seconds
-    root = tkinter.Tk()
-    root.title(title)
-    root.geometry("350x100")
-    root.attributes("-topmost", True)
-    root.resizable(False, False)
-    label = tkinter.Label(root, text=message, font=("Segoe UI", 16), wraplength=320, justify="center")
-    label.pack(expand=True, fill="both", padx=10, pady=10)
-    root.after(1000, root.destroy)
-    root.mainloop()
+def notify(message: str):
+    notif(title=WINDOW_TITLE, message=message, logger=logger)
 
 def shutdown_computer():
     logger.info('Shutting down computer.')
@@ -106,4 +93,5 @@ def schedule_tasks():
     scheduler.start()
 
 if __name__ == "__main__":
+    notify('SE initialised.')
     schedule_tasks()
