@@ -47,7 +47,7 @@ TODAY = datetime.now().date()
 TODAY_START = datetime.combine(TODAY, time.min).isoformat()
 TODAY_END = datetime.combine(TODAY, time.max).isoformat()
 
-BROWSER_PROCESS_NAME = 'brave.exe'
+BROWSER_PROCESS_NAMES = set(['brave.exe', 'firefox'])
 
 DEBUG_MODE: bool = False # Set to False in production
 
@@ -220,14 +220,14 @@ def monitor_browser_process():
         process_detected = watcher()
 
         name = process_detected.Caption.lower()
-        if name != BROWSER_PROCESS_NAME:
+        if name not in BROWSER_PROCESS_NAMES:
             continue
 
         pid = process_detected.ProcessId
         try:
             p = psutil.Process(pid)
             parent = p.parent()
-            if parent and parent.name().lower() == BROWSER_PROCESS_NAME:
+            if parent and parent.name().lower() in BROWSER_PROCESS_NAMES:
                 logger.info("Child browser process detected. Ignoring.")
                 # If you kill the child, the parent will simply spawn a new one. Like Hydra.
                 continue
