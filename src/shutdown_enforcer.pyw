@@ -70,23 +70,43 @@ def close_all_foreground_windows():
     win32gui.EnumWindows(enum_window_callback, None)
 
 def schedule_tasks():
-    scheduler = BlockingScheduler(timezone="UTC")
+    scheduler = BlockingScheduler(timezone="local")
 
-    now = datetime.now()
-    target_time = now.replace(hour=NOTIFY_AT_HOUR, minute=NOTIFY_AT_MIN, second=0, microsecond=0)
+    now = datetime.now().astimezone()
+    target_time = now.replace(
+        hour=NOTIFY_AT_HOUR,
+        minute=NOTIFY_AT_MIN,
+        second=0,
+        microsecond=0
+    )
     if target_time < now:
+        logger.info("It's too late to be running this script. giving up.")
         return
 
-    scheduler.add_job(lambda: notify(f"All active apps will close soon in {SECONDS_BEFORE_APP_CLOSURE // 60} minutes. Save your work!"),
-                      'date', run_date=target_time)
+    scheduler.add_job(
+        lambda: notify(f"All active apps will close soon in {SECONDS_BEFORE_APP_CLOSURE // 60} minutes. Save your work!"),
+        'date',
+        run_date=target_time
+    )
 
-    scheduler.add_job(lambda: [notify(f"Closing apps in {ANTICIPATION_SECONDS} seconds!"), 
-                               close_all_foreground_windows(), notify("Apps closed.")],
-                      'date', run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE))
+    scheduler.add_job(
+        lambda: [
+            notify(f"Closing apps in {ANTICIPATION_SECONDS} seconds!"), 
+            close_all_foreground_windows(),
+            notify("Apps closed.")
+        ],
+        'date',
+        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE)
+    )
 
-    scheduler.add_job(lambda: [notify(f"Shutting down in {ANTICIPATION_SECONDS} seconds!"),
-                               shutdown_computer()],
-                      'date', run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + SECONDS_BEFORE_SHUTDOWN))
+    scheduler.add_job(
+        lambda: [
+            notify(f"Shutting down in {ANTICIPATION_SECONDS} seconds!"),
+            shutdown_computer()
+        ],
+        'date',
+        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + SECONDS_BEFORE_SHUTDOWN)
+    )
 
     scheduler.start()
 
