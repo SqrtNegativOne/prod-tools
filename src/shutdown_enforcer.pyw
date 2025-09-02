@@ -1,5 +1,6 @@
 from apscheduler.schedulers.background import BackgroundScheduler, BlockingScheduler
 from datetime import datetime, timedelta
+from tzlocal import get_localzone
 import os
 import sys
 from pathlib import Path
@@ -70,7 +71,7 @@ def close_all_foreground_windows():
     win32gui.EnumWindows(enum_window_callback, None)
 
 def schedule_tasks():
-    scheduler = BlockingScheduler(timezone="local")
+    scheduler = BlockingScheduler(timezone=get_localzone())
 
     now = datetime.now().astimezone()
     target_time = now.replace(
@@ -111,5 +112,5 @@ def schedule_tasks():
     scheduler.start()
 
 if __name__ == "__main__":
-    notify('SE initialised.')
+    notify('SE started.')
     schedule_tasks()
