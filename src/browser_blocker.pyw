@@ -245,6 +245,8 @@ def monitor_browser_process():
         sleep(1)
 
 if __name__ == '__main__':
+    if datetime.today().weekday() not in (5, 6): # saturday sunday
+        sys.exit(0)
     notify(title="Browser Blocker Started", message="Monitoring browser process.")
     threading.Thread(target=monitor_browser_process, daemon=True).start()
     threading.Event().wait()  # Keep main thread alive
