@@ -17,12 +17,13 @@ logger.add(LOG_PATH)
 
 WINDOW_TITLE = 'SHUTDOWN ENFORCER'
 
-NOTIFY_AT_HOUR = 23; NOTIFY_AT_MIN = 15 # 24 hour format
+INITIAL_NOTIFY_AT_HOUR = 23; INITIAL_NOTIFY_AT_MIN = 15 # 24 hour format
 
 SECONDS_BEFORE_APP_CLOSURE = 15 * 60
 SECONDS_BEFORE_SHUTDOWN = 15 * 60
 
-ANTICIPATION_SECONDS = 20
+CLOSURE_REACTION_SECONDS = 20
+SHUTDOWN_REACTION_SECONDS = 20
 
 def notify(message: str):
     notif(title=WINDOW_TITLE, message=message, logger=logger)
@@ -75,8 +76,8 @@ def schedule_tasks():
 
     now = datetime.now().astimezone()
     target_time = now.replace(
-        hour=NOTIFY_AT_HOUR,
-        minute=NOTIFY_AT_MIN,
+        hour=INITIAL_NOTIFY_AT_HOUR,
+        minute=INITIAL_NOTIFY_AT_MIN,
         second=0,
         microsecond=0
     )
@@ -84,29 +85,48 @@ def schedule_tasks():
         logger.info("It's too late to be running this script. giving up.")
         return
 
+    # Initial notification
     scheduler.add_job(
         lambda: notify(f"All active apps will close soon in {SECONDS_BEFORE_APP_CLOSURE // 60} minutes. Save your work!"),
         'date',
         run_date=target_time
     )
 
+    # Pre-closure notification
     scheduler.add_job(
-        lambda: [
-            notify(f"Closing apps in {ANTICIPATION_SECONDS} seconds!"), 
-            close_all_foreground_windows(),
-            notify("Apps closed.")
-        ],
+        lambda: notify(f"Closing apps in {CLOSURE_REACTION_SECONDS} seconds!"),
         'date',
         run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE)
     )
 
+    # Closure
+    scheduler.add_job(
+        close_all_foreground_windows,
+        'date',
+        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + CLOSURE_REACTION_SECONDS)
+    )
+
+    # Post-closure notification
+    scheduler.add_job(
+        lambda: notify(f"Apps closed. Shutdown in {SECONDS_BEFORE_SHUTDOWN // 60} minutes."),
+        'date',
+        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + CLOSURE_REACTION_SECONDS + 5)
+    )
+
+    # Pre-shutdown notification
     scheduler.add_job(
         lambda: [
-            notify(f"Shutting down in {ANTICIPATION_SECONDS} seconds!"),
-            shutdown_computer()
+            notify(f"Shutting down in {SHUTDOWN_REACTION_SECONDS} seconds!"),
         ],
         'date',
         run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + SECONDS_BEFORE_SHUTDOWN)
+    )
+
+    # Shutdown.
+    scheduler.add_job(
+        shutdown_computer,
+        'date',
+        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + SECONDS_BEFORE_SHUTDOWN + SHUTDOWN_REACTION_SECONDS)
     )
 
     scheduler.start()
