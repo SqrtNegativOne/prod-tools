@@ -17,6 +17,8 @@ logger.add(LOG_PATH)
 
 WINDOW_TITLE = 'SHUTDOWN ENFORCER'
 
+# TODO: give up if the time is before 3 AM or after 11:30 PM.
+
 INITIAL_NOTIFY_AT_HOUR = 23; INITIAL_NOTIFY_AT_MIN = 15 # 24 hour format
 
 SECONDS_BEFORE_APP_CLOSURE = 15 * 60
