@@ -1,5 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler, BlockingScheduler
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from tzlocal import get_localzone
 import os
 import sys
@@ -17,14 +17,14 @@ logger.add(LOG_PATH)
 
 WINDOW_TITLE = 'SHUTDOWN ENFORCER'
 
-# TODO: give up if the time is before 3 AM or after 11:30 PM.
+GIVE_UP_AFTER  = time(23, 30)
+GIVE_UP_BEFORE = time(3, 0)
 
-INITIAL_NOTIFY_AT_HOUR = 23; INITIAL_NOTIFY_AT_MIN = 15 # 24 hour format
+INITIAL_NOTIF = time(23, 15)
+APP_CLOSURE   = time(23, 30)
+SHUTDOWN      = time(23, 59, 59)
 
-SECONDS_BEFORE_APP_CLOSURE = 15 * 60
-SECONDS_BEFORE_SHUTDOWN = 15 * 60
-
-CLOSURE_REACTION_SECONDS = 20
+CLOSURE_REACTION_SECONDS  = 20
 SHUTDOWN_REACTION_SECONDS = 20
 
 def notify(message: str):
@@ -73,66 +73,66 @@ def close_all_foreground_windows():
 
     win32gui.EnumWindows(enum_window_callback, None)
 
-def schedule_tasks():
+def main():
     scheduler = BlockingScheduler(timezone=get_localzone())
 
     now = datetime.now().astimezone()
-    target_time = now.replace(
-        hour=INITIAL_NOTIFY_AT_HOUR,
-        minute=INITIAL_NOTIFY_AT_MIN,
-        second=0,
-        microsecond=0
-    )
-    if target_time < now:
-        logger.info("It's too late to be running this script. giving up.")
+    today = now.date()
+
+    give_up_after = datetime.combine(today, GIVE_UP_AFTER).astimezone()
+    give_up_before = datetime.combine(today, GIVE_UP_BEFORE).astimezone()
+
+    if now > give_up_after or now < give_up_before:
+        logger.info("Giving up on shutdown enforcement.")
         return
+    
+    initial_notif = datetime.combine(today, INITIAL_NOTIF).astimezone()
+    app_closure = datetime.combine(today, APP_CLOSURE).astimezone()
+    shutdown = datetime.combine(today, SHUTDOWN).astimezone()
 
     # Initial notification
     scheduler.add_job(
-        lambda: notify(f"All active apps will close soon in {SECONDS_BEFORE_APP_CLOSURE // 60} minutes. Save your work!"),
+        lambda: notify(f"All active apps will close soon in {(app_closure - initial_notif).seconds // 60} minutes. Save your work!"),
         'date',
-        run_date=target_time
+        run_date=initial_notif
     )
 
     # Pre-closure notification
     scheduler.add_job(
         lambda: notify(f"Closing apps in {CLOSURE_REACTION_SECONDS} seconds!"),
         'date',
-        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE)
+        run_date=app_closure - timedelta(seconds=CLOSURE_REACTION_SECONDS)
     )
 
     # Closure
     scheduler.add_job(
         close_all_foreground_windows,
         'date',
-        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + CLOSURE_REACTION_SECONDS)
+        run_date=app_closure
     )
 
     # Post-closure notification
     scheduler.add_job(
-        lambda: notify(f"Apps closed. Shutdown in {SECONDS_BEFORE_SHUTDOWN // 60} minutes."),
+        lambda: notify(f"Apps closed. Shutdown in {(shutdown - app_closure).seconds // 60} minutes."),
         'date',
-        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + CLOSURE_REACTION_SECONDS + 5)
+        run_date=app_closure + timedelta(seconds=CLOSURE_REACTION_SECONDS + 5)
     )
 
     # Pre-shutdown notification
     scheduler.add_job(
-        lambda: [
-            notify(f"Shutting down in {SHUTDOWN_REACTION_SECONDS} seconds!"),
-        ],
+        lambda: notify(f"Shutting down in {SHUTDOWN_REACTION_SECONDS} seconds!"),
         'date',
-        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + SECONDS_BEFORE_SHUTDOWN)
+        run_date=shutdown - timedelta(seconds=SHUTDOWN_REACTION_SECONDS)
     )
 
     # Shutdown.
     scheduler.add_job(
         shutdown_computer,
         'date',
-        run_date=target_time + timedelta(seconds=SECONDS_BEFORE_APP_CLOSURE + SECONDS_BEFORE_SHUTDOWN + SHUTDOWN_REACTION_SECONDS)
+        run_date=shutdown
     )
 
     scheduler.start()
 
 if __name__ == "__main__":
-    notify('SE started.')
-    schedule_tasks()
+    main()
