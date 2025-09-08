@@ -27,8 +27,8 @@ SHUTDOWN      = time(23, 59, 59)
 CLOSURE_REACTION_SECONDS  = 20
 SHUTDOWN_REACTION_SECONDS = 20
 
-def notify(message: str):
-    notif(title=WINDOW_TITLE, message=message, logger=logger)
+def notify(message: str, ms: int = 800):
+    notif(title=WINDOW_TITLE, message=message, logger=logger, ms=ms)
 
 def shutdown_computer():
     logger.info('Shutting down computer.')
@@ -131,6 +131,14 @@ def main():
         'date',
         run_date=shutdown
     )
+
+    # Post-shutdown.
+    scheduler.add_job(
+        lambda: notify('Shutdown failed for some reason. Can you just shut it down yourself?', ms=2000),
+        'date',
+        run_date=shutdown
+    )
+
 
     scheduler.start()
 

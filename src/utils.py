@@ -5,7 +5,7 @@ TEXT_COLOR = 'white'
 
 SHOW_MILLISECONDS = 800
 
-def notif(title, message, logger):
+def notif(title, message, logger, ms=SHOW_MILLISECONDS):
     logger.info(f"Notification: {title} - {message}")
 
     root = tkinter.Tk()
@@ -29,5 +29,5 @@ def notif(title, message, logger):
         padx=10,
         pady=10
     )
-    root.after(SHOW_MILLISECONDS, root.destroy)
+    root.after(ms, root.destroy)
     root.mainloop()
