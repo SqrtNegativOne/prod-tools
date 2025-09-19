@@ -26,6 +26,7 @@ SHUTDOWN      = time(23, 59, 59)
 
 CLOSURE_REACTION_SECONDS  = 20
 SHUTDOWN_REACTION_SECONDS = 20
+POST_SHUTDOWN_REMINDER_WAIT_SECONDS = 30
 
 def notify(message: str, ms: int = 800):
     notif(title=WINDOW_TITLE, message=message, logger=logger, ms=ms)
@@ -38,7 +39,6 @@ def shutdown_computer():
         return
     
     os.system("shutdown /s /f /t 1")
-    logger.critical("Fuck that didn't work")
 
 def close_all_foreground_windows():
     if not sys.platform.startswith('win'):
@@ -136,10 +136,10 @@ def main():
     scheduler.add_job(
         lambda: notify('Shutdown failed for some reason. Can you just shut it down yourself?', ms=2000),
         'date',
-        run_date=shutdown
+        run_date=shutdown + timedelta(seconds=POST_SHUTDOWN_REMINDER_WAIT_SECONDS)
     )
 
-
+    logger.info("Scheduled all jobs. Entering main loop.")
     scheduler.start()
 
 if __name__ == "__main__":

@@ -20,7 +20,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from loguru import logger
-LOG_PATH = Path(__file__).parent.parent / 'log' / 'browser_blocker.log'
+LOG_PATH = Path(__file__).parent.parent / 'log' / 'app_blocker.log'
 logger.add(LOG_PATH)
 
 # GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
@@ -47,7 +47,7 @@ TODAY = datetime.now().date()
 TODAY_START = datetime.combine(TODAY, time.min).isoformat()
 TODAY_END = datetime.combine(TODAY, time.max).isoformat()
 
-BROWSER_PROCESS_NAMES = set(['brave.exe', 'firefox'])
+APP_PROCESS_NAMES = set(['brave.exe', 'firefox'])
 
 DEBUG_MODE: bool = False # Set to False in production
 
@@ -205,10 +205,10 @@ def sys_exit_if_requirements_fulfilled() -> None:
     ]
 
     if all(req() for req in requirements):
-        logger.info('Quitting browser blocker.')
+        logger.info('Quitting app blocker.')
         sys.exit(0)
 
-def monitor_browser_process():
+def monitor_apps():
     pythoncom.CoInitialize()  # initialize COM for this thread
 
     c = wmi.WMI()
@@ -220,22 +220,22 @@ def monitor_browser_process():
         process_detected = watcher()
 
         name = process_detected.Caption.lower()
-        if name not in BROWSER_PROCESS_NAMES:
+        if name not in APP_PROCESS_NAMES:
             continue
 
         pid = process_detected.ProcessId
         try:
             p = psutil.Process(pid)
             parent = p.parent()
-            if parent and parent.name().lower() in BROWSER_PROCESS_NAMES:
-                logger.info("Child browser process detected. Ignoring.")
+            if parent and parent.name().lower() in APP_PROCESS_NAMES:
+                logger.info("Child app process detected. Ignoring.")
                 # If you kill the child, the parent will simply spawn a new one. Like Hydra.
                 continue
-            logger.info("Parent browser process detected.")
+            logger.info("Parent app process detected.")
 
             sys_exit_if_requirements_fulfilled()
 
-            logger.info("Requirements not satisfied: killing browser.")
+            logger.info("Requirements not satisfied: killing app.")
             p.kill()
         except psutil.NoSuchProcess:
             continue
@@ -247,6 +247,6 @@ def monitor_browser_process():
 if __name__ == '__main__':
     if datetime.today().weekday() not in (5, 6): # saturday sunday
         sys.exit(0)
-    notify(title="Browser Blocker Started", message="Monitoring browser process.")
-    threading.Thread(target=monitor_browser_process, daemon=True).start()
+    notify(title="App Blocker Started", message="Monitoring app process.")
+    threading.Thread(target=monitor_apps, daemon=True).start()
     threading.Event().wait()  # Keep main thread alive
