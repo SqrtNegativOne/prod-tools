@@ -47,7 +47,9 @@ TODAY = datetime.now().date()
 TODAY_START = datetime.combine(TODAY, time.min).isoformat()
 TODAY_END = datetime.combine(TODAY, time.max).isoformat()
 
-APP_PROCESS_NAMES = set(['brave.exe', 'firefox'])
+APP_PROCESS_NAMES = set([
+    'brave.exe', 'firefox', 'Vesktop.exe', 'chrome.exe', 'msedge.exe', 'opera.exe'
+])
 
 DEBUG_MODE: bool = False # Set to False in production
 
