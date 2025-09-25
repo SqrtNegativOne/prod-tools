@@ -6,7 +6,7 @@ import wmi
 import threading
 from datetime import datetime, time
 from time import sleep
-from notion_client import Client
+from notion_client import Client as NotionClient
 from pathlib import Path
 
 import pythoncom
@@ -74,7 +74,7 @@ def no_notion_tasks_to_sort() -> bool:
     if not NOTION_TASKS_DATABASE_ID:
         raise ValueError("NOTION_TASKS_DATABASE_ID environment variable is not set.")
 
-    notion = Client(auth=NOTION_KEY)
+    notion = NotionClient(auth=NOTION_KEY)
     response = notion.databases.query(
         database_id=NOTION_TASKS_DATABASE_ID,
         filter={
