@@ -79,20 +79,20 @@ def main():
     now = datetime.now().astimezone()
     today = now.date()
 
-    give_up_after = datetime.combine(today, GIVE_UP_AFTER).astimezone()
-    give_up_before = datetime.combine(today, GIVE_UP_BEFORE).astimezone()
+    give_up_after = datetime.combine(today, GIVE_UP_AFTER).replace(tzinfo=get_localzone())
+    give_up_before = datetime.combine(today, GIVE_UP_BEFORE).replace(tzinfo=get_localzone())
 
     if now > give_up_after or now < give_up_before:
         logger.info("Giving up on shutdown enforcement.")
         return
     
-    initial_notif = datetime.combine(today, INITIAL_NOTIF).astimezone()
-    app_closure = datetime.combine(today, APP_CLOSURE).astimezone()
-    shutdown = datetime.combine(today, SHUTDOWN).astimezone()
+    initial_notif = datetime.combine(today, INITIAL_NOTIF).replace(tzinfo=get_localzone())
+    app_closure = datetime.combine(today, APP_CLOSURE).replace(tzinfo=get_localzone())
+    shutdown = datetime.combine(today, SHUTDOWN).replace(tzinfo=get_localzone())
 
     # Initial notification
     scheduler.add_job(
-        lambda: notify(f"All active apps will close soon in {(app_closure - initial_notif).seconds // 60} minutes. Save your work!"),
+        lambda: notify(f"All active apps will close soon in {int((app_closure - initial_notif).total_seconds() // 60)} minutes. Save your work!"),
         'date',
         run_date=initial_notif
     )
@@ -113,7 +113,7 @@ def main():
 
     # Post-closure notification
     scheduler.add_job(
-        lambda: notify(f"Apps closed. Shutdown in {(shutdown - app_closure).seconds // 60} minutes."),
+        lambda: notify(f"Apps closed. Shutdown in {int((shutdown - app_closure).total_seconds() // 60)} minutes."),
         'date',
         run_date=app_closure + timedelta(seconds=CLOSURE_REACTION_SECONDS + 5)
     )
@@ -140,6 +140,7 @@ def main():
     )
 
     logger.info("Scheduled all jobs. Entering main loop.")
+    # Note: scheduler.start() blocks and will not return until all jobs are finished or the scheduler is stopped.
     scheduler.start()
 
 if __name__ == "__main__":
