@@ -207,7 +207,7 @@ def sys_exit_if_requirements_fulfilled() -> None:
     ]
 
     if all(req() for req in requirements):
-        logger.info('Quitting app blocker.')
+        logger.info('Requirements satisfied; killing app blocker.')
         sys.exit(0)
 
 def monitor_apps():
@@ -230,14 +230,14 @@ def monitor_apps():
             p = psutil.Process(pid)
             parent = p.parent()
             if parent and parent.name().lower() in APP_PROCESS_NAMES:
-                logger.info("Child app process detected. Ignoring.")
+                logger.info(f"Child app process of name {name} detected. Ignoring.")
                 # If you kill the child, the parent will simply spawn a new one. Like Hydra.
                 continue
-            logger.info("Parent app process detected.")
+            logger.info(f"Parent app process of name {name} detected.")
 
             sys_exit_if_requirements_fulfilled()
 
-            logger.info("Requirements not satisfied: killing app.")
+            logger.info(f"Requirements not satisfied: killing {name}.")
             p.kill()
         except psutil.NoSuchProcess:
             continue
@@ -249,6 +249,5 @@ def monitor_apps():
 if __name__ == '__main__':
     if datetime.today().weekday() not in (5, 6): # saturday sunday
         sys.exit(0)
-    notify(title="App Blocker Started", message="Monitoring app process.")
     threading.Thread(target=monitor_apps, daemon=True).start()
     threading.Event().wait()  # Keep main thread alive
