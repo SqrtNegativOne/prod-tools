@@ -48,7 +48,7 @@ TODAY_START = datetime.combine(TODAY, time.min).isoformat()
 TODAY_END = datetime.combine(TODAY, time.max).isoformat()
 
 APP_PROCESS_NAMES = set([
-    'brave.exe', 'firefox', 'Vesktop.exe', 'chrome.exe', 'msedge.exe', 'opera.exe'
+    'brave.exe', 'firefox.exe', 'Vesktop.exe', 'chrome.exe', 'msedge.exe', 'opera.exe'
 ])
 
 DEBUG_MODE: bool = False # Set to False in production
@@ -248,6 +248,7 @@ def monitor_apps():
 
 if __name__ == '__main__':
     if datetime.today().weekday() not in (5, 6): # saturday sunday
+        logger.info("It's a weekday; exiting.")
         sys.exit(0)
     threading.Thread(target=monitor_apps, daemon=True).start()
     threading.Event().wait()  # Keep main thread alive
