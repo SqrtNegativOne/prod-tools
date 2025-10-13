@@ -23,8 +23,8 @@ from loguru import logger
 LOG_PATH = Path(__file__).parent.parent / 'log' / 'app_blocker.log'
 logger.add(LOG_PATH)
 
-# GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
-# DONT_TRY_BEFORE_THIS_HOUR =  6 # 24 hour time format
+GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
+DONT_TRY_BEFORE_THIS_HOUR =  6 # 24 hour time format
 CAL_ITEMS_REQUIRED = 3
 
 BASE_DIR = Path(__file__).parent
@@ -47,7 +47,9 @@ TODAY = datetime.now().date()
 TODAY_START = datetime.combine(TODAY, time.min).isoformat()
 TODAY_END = datetime.combine(TODAY, time.max).isoformat()
 
-APP_PROCESS_NAMES = set([
+TIME_FORMAT = "%Y-%m-%d"
+
+APP_PROCESS_FULL_NAMES = set([
     'brave.exe', 'firefox.exe', 'Vesktop.exe', 'chrome.exe', 'msedge.exe', 'opera.exe'
 ])
 
@@ -180,33 +182,33 @@ def adequate_google_cal_tasks_scheduled() -> bool:
 
 def save_time() -> None:
     now = datetime.now()
-    formatted = now.strftime("%Y-%m-%d %H")
+    formatted = now.strftime(TIME_FORMAT)
     
     with open(LAST_TIME_OPENED_FILE_PATH, 'w') as f:
         f.writelines(formatted)
 
 def first_time_in_day_running_script() -> bool:
-    if not LAST_TIME_OPENED_FILE_PATH.exists:
+    if not LAST_TIME_OPENED_FILE_PATH.exists():
         save_time()
+        return True
 
     with open(LAST_TIME_OPENED_FILE_PATH, 'r') as f:
-        time_string = f.readline()
-    
+        last_day_string = f.readline().strip()
+
+    current_day_string = datetime.now().strftime(TIME_FORMAT)
     save_time()
 
-    # Check time; TODO
-
-    return True
+    return last_day_string != current_day_string
 
 
 
-def sys_exit_if_requirements_fulfilled() -> None:
-    requirements = [
+def check_exit_requirements() -> None:
+    exit_requirements = [
         no_notion_tasks_to_sort,
         adequate_google_cal_tasks_scheduled
     ]
 
-    if all(req() for req in requirements):
+    if all(req() for req in exit_requirements):
         logger.info('Requirements satisfied; killing app blocker.')
         sys.exit(0)
 
@@ -222,20 +224,20 @@ def monitor_apps():
         process_detected = watcher()
 
         name = process_detected.Caption.lower()
-        if name not in APP_PROCESS_NAMES:
+        if name not in APP_PROCESS_FULL_NAMES:
             continue
 
         pid = process_detected.ProcessId
         try:
             p = psutil.Process(pid)
             parent = p.parent()
-            if parent and parent.name().lower() in APP_PROCESS_NAMES:
-                logger.info(f"Child app process of name {name} detected. Ignoring.")
+            if parent and parent.name().lower() in APP_PROCESS_FULL_NAMES:
+                # logger.info(f"Child app process of name {name} detected. Ignoring.")
                 # If you kill the child, the parent will simply spawn a new one. Like Hydra.
                 continue
             logger.info(f"Parent app process of name {name} detected.")
 
-            sys_exit_if_requirements_fulfilled()
+            check_exit_requirements()
 
             logger.info(f"Requirements not satisfied: killing {name}.")
             p.kill()
@@ -247,8 +249,14 @@ def monitor_apps():
         sleep(1)
 
 if __name__ == '__main__':
-    if datetime.today().weekday() not in (5, 6): # saturday sunday
-        logger.info("It's a weekday; exiting.")
+    # if datetime.today().weekday() not in (5, 6): # saturday sunday
+    #     logger.info("It's a weekday; exiting.")
+    #     sys.exit(0)
+    if not first_time_in_day_running_script():
+        logger.info("Script has already run today; exiting.")
+        sys.exit(0)
+    if not DEBUG_MODE and not (DONT_TRY_BEFORE_THIS_HOUR <= datetime.now().hour < GIVE_UP_AFTER_THIS_HOUR):
+        logger.info("It's either too early or too late; exiting.")
         sys.exit(0)
     threading.Thread(target=monitor_apps, daemon=True).start()
     threading.Event().wait()  # Keep main thread alive
