@@ -3,5 +3,6 @@ secrets
 .venv
 
 *.log
+last.txt
 
 __pycache__
