@@ -2,28 +2,30 @@ import subprocess
 import ctypes
 from datetime import datetime, timedelta
 from tzlocal import get_localzone
-import os
 import sys
 from loguru import logger
 from utils import notif
+from typing import Final
 
-WINDOW_TITLE = "Shutdown Enforcer"
+WINDOW_TITLE: Final[str] = "Shutdown Enforcer"
 
-INITIAL_NOTIF = "19:00"
-APP_CLOSURE = "19:25"
-SHUTDOWN = "19:30"
-GIVE_UP_BEFORE = "05:00"
-GIVE_UP_AFTER = "23:30"
+INITIAL_NOTIF: Final[str] = "19:00"
+APP_CLOSURE: Final[str] = "19:25"
+SHUTDOWN: Final[str] = "19:30"
+GIVE_UP_BEFORE: Final[str] = "05:00"
+GIVE_UP_AFTER: Final[str] = "23:30"
 
-CLOSURE_REACTION_SECONDS = 30
-SHUTDOWN_REACTION_SECONDS = 30
-POST_SHUTDOWN_REMINDER_WAIT_SECONDS = 60
+CLOSURE_REACTION_SECONDS: Final[int] = 30
+SHUTDOWN_REACTION_SECONDS: Final[int] = 30
+POST_SHUTDOWN_REMINDER_WAIT_SECONDS: Final[int] = 60
 
-TASK_PREFIX = "ShutdownEnforcer_"
+TASK_PREFIX: Final[str] = "ShutdownEnforcer_"
 
 from pathlib import Path
-BASE_DIR = Path(__file__).parent
-LOG_PATH = os.path.join(BASE_DIR, "ShutdownEnforcer.log")
+BASE_DIR: Final[Path] = Path(__file__).parent.parent
+LOG_PATH: Final[Path] = BASE_DIR / 'log' / 'shutdown_enforcer.log'
+
+logger.add(LOG_PATH)
 
 
 def notify(message: str, ms: int = 800):
@@ -151,13 +153,13 @@ def main():
 
     create_task(
         "InitialNotif",
-        notify(f"All active apps will close soon in {closure_diff} minutes. Save your work! (Apps close at {APP_CLOSURE})"),
+        notify(f"Closure in {closure_diff} minutes. Save your work! (at {APP_CLOSURE})"),
         initial_notif
     )
 
     create_task(
         "PreClosure",
-        notify(f"Closing apps in {CLOSURE_REACTION_SECONDS} seconds! (Closure at {APP_CLOSURE})"),
+        notify(f"Closure in {CLOSURE_REACTION_SECONDS} seconds! (at {APP_CLOSURE})"),
         app_closure - timedelta(seconds=CLOSURE_REACTION_SECONDS)
     )
 
@@ -175,7 +177,7 @@ def main():
 
     create_task(
         "PreShutdown",
-        notify(f"Shutting down in {SHUTDOWN_REACTION_SECONDS} seconds! (Shutdown at {SHUTDOWN})"),
+        notify(f"Shutting down in {SHUTDOWN_REACTION_SECONDS} seconds! (at {SHUTDOWN})"),
         shutdown - timedelta(seconds=SHUTDOWN_REACTION_SECONDS)
     )
 
