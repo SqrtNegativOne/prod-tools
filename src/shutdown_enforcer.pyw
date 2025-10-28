@@ -4,14 +4,19 @@ from datetime import datetime, timedelta
 from tzlocal import get_localzone
 import sys
 from loguru import logger
-from utils import notif
 from typing import Final
+from pathlib import Path
+import argparse
+import psutil
 
-WINDOW_TITLE: Final[str] = "Shutdown Enforcer"
+_LOCAL_TZ = get_localzone()
 
-INITIAL_NOTIF: Final[str] = "19:00"
-APP_CLOSURE: Final[str] = "19:25"
-SHUTDOWN: Final[str] = "19:30"
+NOTIFY_WINDOW_TITLE: Final[str] = "Shutdown Enforcer"
+
+INITIAL_NOTIF: Final[str] = "23:00"
+APP_CLOSURE: Final[str] = "23:30"
+SHUTDOWN: Final[str] = "23:50"
+
 GIVE_UP_BEFORE: Final[str] = "05:00"
 GIVE_UP_AFTER: Final[str] = "23:30"
 
@@ -21,51 +26,11 @@ POST_SHUTDOWN_REMINDER_WAIT_SECONDS: Final[int] = 60
 
 TASK_PREFIX: Final[str] = "ShutdownEnforcer_"
 
-from pathlib import Path
 BASE_DIR: Final[Path] = Path(__file__).parent.parent
 LOG_PATH: Final[Path] = BASE_DIR / 'log' / 'shutdown_enforcer.log'
 
-logger.add(LOG_PATH)
+logger.add(LOG_PATH, rotation="1 week")
 
-
-def notify(message: str, ms: int = 800):
-    notif(title=WINDOW_TITLE, message=message, logger=logger, ms=ms)
-
-def close_all_foreground_windows():
-    import win32gui
-    import win32process
-    import psutil
-    if not sys.platform.startswith('win'):
-        print("Foreground app closing only supported on Windows.")
-        return
-
-
-    def enum_window_callback(hwnd, _):
-        if not win32gui.IsWindowEnabled(hwnd):
-            return
-        if win32gui.GetParent(hwnd):
-            return
-        
-        try:
-            _, pid = win32process.GetWindowThreadProcessId(hwnd)
-            proc = psutil.Process(pid)
-
-            window_title = win32gui.GetWindowText(hwnd)
-            if not window_title.strip():
-                return
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            return
-        except Exception as e:
-            logger.warning(f"Unexpected error retrieving process info: {e}")
-            return
-
-        logger.info(f"Closing window '{window_title}' from process '{proc.name()}' (PID: {pid})")
-        try:
-            win32gui.PostMessage(hwnd, 0x0010, 0, 0)  # WM_CLOSE
-        except Exception as e:
-            logger.error(f"Failed to send WM_CLOSE to window '{window_title}': {e}")
-
-    win32gui.EnumWindows(enum_window_callback, None)
 
 def is_admin() -> bool:
     try:
@@ -73,12 +38,12 @@ def is_admin() -> bool:
     except Exception:
         return False
 
-def parse_time(t):
-    """Accepts 'HH:MM' or datetime.time and returns timezone-aware datetime for today."""
-    tz = get_localzone()
-    if isinstance(t, str):
-        t = datetime.strptime(t, "%H:%M").time()
-    return datetime.now(tz).replace(hour=t.hour, minute=t.minute, second=0, microsecond=0)
+
+def parse_time(t: str):
+    ti = datetime.strptime(t, "%H:%M").time()
+    now = datetime.now(_LOCAL_TZ)
+    return now.replace(hour=ti.hour, minute=ti.minute, second=0, microsecond=0)
+
 
 def run_cmd(args):
     """Run a command safely, log output, and raise on failure."""
@@ -87,29 +52,33 @@ def run_cmd(args):
         if result.stdout.strip():
             logger.info(result.stdout.strip())
     except subprocess.CalledProcessError as e:
-        logger.info(f"Command failed: {' '.join(args)}\nError: {e.stderr.strip()}")
+        logger.error(f"Command failed: {' '.join(args)}\nstdout:\n{e.stdout}\nstderr:\n{e.stderr}")
         raise
+
 
 def delete_existing_tasks():
     """Delete previously created ShutdownEnforcer tasks."""
-    result = subprocess.run(["schtasks", "/query", "/fo", "TABLE"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["schtasks", "/query", "/fo", "CSV", "/v"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8"
+    )
     for line in result.stdout.splitlines():
         if TASK_PREFIX in line:
-            parts = line.split()
-            if parts:
-                task_name = parts[0]
-                logger.info(f"Deleting old task {task_name}")
-                subprocess.run(["schtasks", "/delete", "/tn", task_name, "/f"],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            task_name = line.split(",")[0].strip('"')
+            logger.info(f"Deleting old task {task_name}")
+            subprocess.run(["schtasks", "/delete", "/tn", task_name, "/f"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-def create_task(name, command, run_time):
-    """Create a one-time scheduled task at a given datetime."""
+
+def create_task(name: str, command: str, run_time):
     if isinstance(run_time, str):
         run_time = parse_time(run_time)
 
     date_str = run_time.strftime("%Y/%m/%d")
     time_str = run_time.strftime("%H:%M:%S")
-    full_name = f"{TASK_PREFIX}{name}_{run_time.strftime('%Y%m%d')}"
+    full_name = f"{TASK_PREFIX}{name}_{run_time.strftime('%Y%m%d_%H%M')}"
 
     cmd = [
         "schtasks", "/create",
@@ -118,24 +87,63 @@ def create_task(name, command, run_time):
         "/sc", "once",
         "/sd", date_str,
         "/st", time_str,
-        "/ru", "SYSTEM"
+        "/ru", f"{psutil.Process().username()}"
     ]
 
     logger.info(f"Creating task: {full_name} at {run_time.isoformat()}")
     run_cmd(cmd)
 
-def main():
+
+def notify(message: str, ms: int = 1500):
+    """Delegated notification using your utils.notif() if available."""
+    try:
+        from utils import notif
+        notif(title=NOTIFY_WINDOW_TITLE, message=message, logger=logger, ms=ms)
+    except ImportError:
+        logger.info(f"[NOTIFY] {message}")
+
+
+def close_foreground_windows_safe():
+    import win32gui
+    import win32process
+
+    def enum_window_callback(hwnd, _):
+        if not win32gui.IsWindowVisible(hwnd) or not win32gui.IsWindowEnabled(hwnd):
+            return
+        if win32gui.GetParent(hwnd):
+            return
+
+        try:
+            _, pid = win32process.GetWindowThreadProcessId(hwnd)
+            proc = psutil.Process(pid)
+            if proc.name().lower() in {"explorer.exe", "taskmgr.exe"}:
+                return
+            window_title = win32gui.GetWindowText(hwnd)
+            if not window_title.strip():
+                return
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return
+        except Exception as e:
+            logger.warning(f"Error checking process info: {e}")
+            return
+
+        logger.info(f"Closing window '{window_title}' from '{proc.name()}' (PID {pid})")
+        try:
+            win32gui.PostMessage(hwnd, 0x0010, 0, 0)
+        except Exception as e:
+            logger.error(f"Failed to close '{window_title}': {e}")
+
+    win32gui.EnumWindows(enum_window_callback, None)
+
+
+# === Main setup ===
+def setup_tasks():
     if not is_admin():
-        raise PermissionError("This script must be run with administrative privileges.")
+        raise PermissionError("This script must be run as administrator.")
 
-    tz = get_localzone()
-    now = datetime.now(tz)
-
-    give_up_after = parse_time(GIVE_UP_AFTER)
-    give_up_before = parse_time(GIVE_UP_BEFORE)
-
-    if now > give_up_after or now < give_up_before:
-        logger.info("Outside active scheduling hours. Exiting.")
+    now = datetime.now(_LOCAL_TZ)
+    if now > parse_time(GIVE_UP_AFTER) or now < parse_time(GIVE_UP_BEFORE):
+        logger.info("Outside scheduling hours. Exiting.")
         return
 
     delete_existing_tasks()
@@ -144,51 +152,57 @@ def main():
     app_closure = parse_time(APP_CLOSURE)
     shutdown = parse_time(SHUTDOWN)
 
-    if not (initial_notif < app_closure < shutdown):
-        raise ValueError("Invalid time configuration: expected INITIAL_NOTIF < APP_CLOSURE < SHUTDOWN")
-
     closure_diff = int((app_closure - initial_notif).total_seconds() // 60)
     shutdown_diff = int((shutdown - app_closure).total_seconds() // 60)
 
+    py = sys.executable
+    script = Path(__file__).resolve()
+
+    def run(action, msg=None):
+        base = f'"{py}" "{script}" --action {action}'
+        if msg:
+            base += f' --msg "{msg}"'
+        return base
+
     create_task(
         "InitialNotif",
-        notify(f"Closure in {closure_diff} minutes. Save your work! (at {APP_CLOSURE})"),
+        run("notify", f"Closure in {closure_diff} minutes (at {APP_CLOSURE})"),
         initial_notif
     )
 
     create_task(
         "PreClosure",
-        notify(f"Closure in {CLOSURE_REACTION_SECONDS} seconds! (at {APP_CLOSURE})"),
+        run("notify", f"Closure in {CLOSURE_REACTION_SECONDS} seconds"),
         app_closure - timedelta(seconds=CLOSURE_REACTION_SECONDS)
     )
 
     create_task(
         "Closure",
-        close_all_foreground_windows(),
+        run("close"),
         app_closure
     )
 
     create_task(
         "PostClosureNotif",
-        notify(f"Apps closed. Shutdown in {shutdown_diff} minutes (at {SHUTDOWN})."),
+        run("notify", f"Closed. Shutdown in {shutdown_diff} minutes (at {SHUTDOWN})"),
         app_closure + timedelta(seconds=CLOSURE_REACTION_SECONDS + 5)
     )
 
     create_task(
         "PreShutdown",
-        notify(f"Shutting down in {SHUTDOWN_REACTION_SECONDS} seconds! (at {SHUTDOWN})"),
+        run("notify", f"Shutdown in {SHUTDOWN_REACTION_SECONDS} seconds (at {SHUTDOWN})"),
         shutdown - timedelta(seconds=SHUTDOWN_REACTION_SECONDS)
     )
 
     create_task(
         "Shutdown",
-        "shutdown /s /t 0",
+        run("shutdown_now"),
         shutdown
     )
 
     create_task(
         "PostShutdownReminder",
-        notify("Shutdown may have failed. Please shut down manually."),
+        run("notify", "Shutdown may have failed. Please shut down manually."),
         shutdown + timedelta(seconds=POST_SHUTDOWN_REMINDER_WAIT_SECONDS)
     )
 
@@ -196,8 +210,24 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--action", choices=["setup", "notify", "close", "shutdown_now"],
+                        help="Action to perform. Defaults to 'setup' if omitted.")
+    parser.add_argument("--msg", help="Optional message for notify")
+    args = parser.parse_args()
+
+    # Default to setup if --action missing
+    action = args.action or "setup"
+
     try:
-        main()
+        if action == "setup":
+            setup_tasks()
+        elif action == "notify":
+            notify(args.msg or "Notification")
+        elif action == "close":
+            close_foreground_windows_safe()
+        elif action == "shutdown_now":
+            subprocess.run(["shutdown", "/s", "/t", "0"])
     except Exception as e:
-        logger.info(f"Fatal error: {e}")
+        logger.exception(f"Fatal error in action '{action}': {e}")
         sys.exit(1)
