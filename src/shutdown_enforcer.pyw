@@ -126,7 +126,6 @@ def create_task(name, command, run_time):
 
 def main():
     if not is_admin():
-        logger.info("Error: Script must be run as administrator.")
         raise PermissionError("This script must be run with administrative privileges.")
 
     tz = get_localzone()
