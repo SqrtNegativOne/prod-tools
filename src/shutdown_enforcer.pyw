@@ -76,7 +76,7 @@ def create_task(name: str, command: str, run_time):
     if isinstance(run_time, str):
         run_time = parse_time(run_time)
 
-    date_str = run_time.strftime("%Y/%m/%d")
+    date_str = run_time.strftime("%d/%m/%Y")
     time_str = run_time.strftime("%H:%M:%S")
     full_name = f"{TASK_PREFIX}{name}_{run_time.strftime('%Y%m%d_%H%M')}"
 
