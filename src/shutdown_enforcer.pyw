@@ -136,7 +136,6 @@ def close_foreground_windows_safe():
     win32gui.EnumWindows(enum_window_callback, None)
 
 
-# === Main setup ===
 def setup_tasks():
     if not is_admin():
         raise PermissionError("This script must be run as administrator.")
