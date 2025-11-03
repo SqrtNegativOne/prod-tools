@@ -232,6 +232,12 @@ if __name__ == "__main__":
         elif action == "close":
             close_foreground_windows_safe()
         elif action == "shutdown_now":
+            notify("Shutting down now.", ms=2000)
+            # Sanity check before shutdown
+            now = datetime.now(_LOCAL_TZ)
+            if now < parse_time(SHUTDOWN) - timedelta(minutes=5):
+                logger.warning("Shutdown invoked too early. Aborting shutdown.")
+                sys.exit(1)
             subprocess.run(["shutdown", "/s", "/t", "0"])
     except Exception as e:
         logger.exception(f"Fatal error in action '{action}': {e}")
