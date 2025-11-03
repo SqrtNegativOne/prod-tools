@@ -29,7 +29,7 @@ TASK_PREFIX: Final[str] = "ShutdownEnforcer_"
 BASE_DIR: Final[Path] = Path(__file__).parent.parent
 LOG_PATH: Final[Path] = BASE_DIR / 'log' / 'shutdown_enforcer.log'
 
-logger.add(LOG_PATH, rotation="1 week")
+logger.add(LOG_PATH)
 
 
 def is_admin() -> bool:
@@ -47,6 +47,7 @@ def parse_time(t: str):
 
 def run_cmd(args):
     """Run a command safely, log output, and raise on failure."""
+    logger.info(f"Running command: {' '.join(args)}")
     try:
         result = subprocess.run(args, check=True, capture_output=True, text=True)
         if result.stdout.strip():
@@ -68,8 +69,10 @@ def delete_existing_tasks():
         if TASK_PREFIX in line:
             task_name = line.split(",")[0].strip('"')
             logger.info(f"Deleting old task {task_name}")
-            subprocess.run(["schtasks", "/delete", "/tn", task_name, "/f"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                ["schtasks", "/delete", "/tn", task_name, "/f"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
 
 
 def create_task(name: str, command: str, run_time):
@@ -210,8 +213,11 @@ def setup_tasks():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=["setup", "notify", "close", "shutdown_now"],
-                        help="Action to perform. Defaults to 'setup' if omitted.")
+    parser.add_argument(
+        "--action",
+        choices=["setup", "notify", "close", "shutdown_now"],
+        help="Action to perform. Defaults to 'setup' if omitted."
+    )
     parser.add_argument("--msg", help="Optional message for notify")
     args = parser.parse_args()
 
