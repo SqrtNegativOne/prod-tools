@@ -47,4 +47,7 @@ def main():
             logger.error("Failed to open Notion page via HTTPS.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logger.exception(f"An error occurred: {e}")

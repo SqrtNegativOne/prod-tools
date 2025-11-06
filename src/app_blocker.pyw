@@ -258,5 +258,8 @@ if __name__ == '__main__':
     if not DEBUG_MODE and not (DONT_TRY_BEFORE_THIS_HOUR <= datetime.now().hour < GIVE_UP_AFTER_THIS_HOUR):
         logger.info("It's either too early or too late; exiting.")
         sys.exit(0)
-    threading.Thread(target=monitor_apps, daemon=True).start()
-    threading.Event().wait()  # Keep main thread alive
+    try:
+        threading.Thread(target=monitor_apps, daemon=True).start()
+        threading.Event().wait()  # Keep main thread alive
+    except Exception as e:
+        logger.exception(f"An error occurred in the main thread: {e}")

@@ -239,6 +239,12 @@ if __name__ == "__main__":
                 logger.warning("Shutdown invoked too early. Aborting shutdown.")
                 sys.exit(1)
             subprocess.run(["shutdown", "/s", "/t", "0"])
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Subprocess command failed: {e}")
+        logger.error(f"Subprocess command failed with exit code {e.returncode}")
+        logger.error(f"Command: {' '.join(e.cmd)}")
+        logger.error(f"STDOUT: {e.stdout}")
+        logger.error(f"STDERR: {e.stderr}") # This will likely contain the *real* error message
     except Exception as e:
         logger.exception(f"Fatal error in action '{action}': {e}")
         sys.exit(1)
