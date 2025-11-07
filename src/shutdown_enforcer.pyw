@@ -223,15 +223,20 @@ if __name__ == "__main__":
 
     # Default to setup if --action missing
     action = args.action or "setup"
+    logger.info(f"Script run with {action} action.")
 
     try:
         if action == "setup":
+            logger.info(f"Setting up tasks.")
             setup_tasks()
         elif action == "notify":
+            logger.info(f"Notifying.")
             notify(args.msg or "Notification")
         elif action == "close":
+            logger.info(f"Closing all foreground windows.")
             close_foreground_windows_safe()
         elif action == "shutdown_now":
+            logger.info(f"Shutting down the system now.")
             notify("Shutting down now.", ms=2000)
             # Sanity check before shutdown
             now = datetime.now(_LOCAL_TZ)
