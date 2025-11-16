@@ -14,7 +14,7 @@ _LOCAL_TZ = get_localzone()
 NOTIFY_WINDOW_TITLE: Final[str] = "Shutdown Enforcer"
 
 INITIAL_NOTIF: Final[str] = "23:00"
-APP_CLOSURE: Final[str] = "23:30"
+APP_CLOSURE: Final[str] = "23:35"
 SHUTDOWN: Final[str] = "23:50"
 
 GIVE_UP_BEFORE: Final[str] = "05:00"
