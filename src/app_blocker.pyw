@@ -50,7 +50,7 @@ TODAY_END = datetime.combine(TODAY, time.max).isoformat()
 TIME_FORMAT = "%Y-%m-%d"
 
 APP_PROCESS_FULL_NAMES = set([
-    'brave.exe', 'firefox.exe', 'Vesktop.exe', 'chrome.exe', 'msedge.exe', 'opera.exe'
+    'brave.exe', 'firefox.exe', 'vesktop.exe', 'chrome.exe', 'msedge.exe', 'opera.exe'
 ])
 
 DEBUG_MODE: bool = False # Set to False in production
