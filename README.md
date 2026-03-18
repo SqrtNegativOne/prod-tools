@@ -5,3 +5,5 @@ A collection of Python scripts that help me maintain productivity every day.
 
 I moved this into its own repo because it grew too large for a single script.
 - Shutdown enforcer: forces me go to sleep instead of working through the night.
+- Pomodoro timer: runs 25/5 work-break cycles (long break after every 4 sessions), notifying at each transition.
+- Weekly review opener: launches the latest weekly review page in my Notion weekly review database.
