@@ -15,5 +15,6 @@ dependencies = [
     "notion-client>=2.4.0",
     "psutil>=7.0.0",
     "requests>=2.32.4",
+    "tomli>=2.4.1",
     "wmi>=1.5.1",
 ]
