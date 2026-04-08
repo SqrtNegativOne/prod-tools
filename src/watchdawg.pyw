@@ -1,16 +1,14 @@
 """
-Super Productivity Watchdog
-----------------------------
+Watchdawg
 Runs at Windows logon. Reads app config from input/watchdawg.toml.
 Every check_interval_sec, confirms each monitored app is in the process
 list. If absent, waits relaunch_delay_sec (per-app or global), then
 re-launches the executable.
 """
 
-import os
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from loguru import logger
 
@@ -22,10 +20,9 @@ import tomli as tomllib
 # ---------------------------------------------------------------------------
 
 _TOML_PATH = Path(__file__).parent.parent / "input" / "watchdawg.toml"
+_LOG_DIR = Path(__file__).parent.parent / "logs"
 
-_log_dir = os.path.join(os.environ["APPDATA"], "Watchdawg")
-os.makedirs(_log_dir, exist_ok=True)
-logger.add(os.path.join(_log_dir, "watchdog.log"), rotation="1 week", retention=2)
+logger.add(_LOG_DIR / "watchdawg.log", rotation="1 week", retention=2)
 log = logger
 
 
@@ -88,6 +85,8 @@ def launch(app: AppConfig) -> None:
 
 
 def main() -> None:
+    log.info("Watchdawg initializing.")
+
     check_interval, initial_delay, apps = load_config(_TOML_PATH)
 
     log.info("Watchdawg started. Monitoring: %s", ", ".join(a.process_name for a in apps))
@@ -95,16 +94,22 @@ def main() -> None:
 
     time.sleep(initial_delay)
 
+    log.info("Watchdawg entering main loop.")
+
     while True:
         for app in apps:
+            if is_running(app.process_name):
+                log.debug("%s is running.", app.process_name)
+                continue
+
+            log.info(
+                "%s not running. Waiting %ds before relaunch.",
+                app.process_name, app.relaunch_delay_sec,
+            )
+            time.sleep(app.relaunch_delay_sec)
             if not is_running(app.process_name):
-                log.info(
-                    "%s not running. Waiting %ds before relaunch.",
-                    app.process_name, app.relaunch_delay_sec,
-                )
-                time.sleep(app.relaunch_delay_sec)
-                if not is_running(app.process_name):
-                    launch(app)
+                launch(app)
+        
         time.sleep(check_interval)
 
 
