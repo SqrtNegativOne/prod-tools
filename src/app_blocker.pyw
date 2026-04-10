@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from dotenv import load_dotenv
 import sys
 import psutil
@@ -26,6 +27,7 @@ logger.add(LOG_PATH)
 GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
 DONT_TRY_BEFORE_THIS_HOUR =  6 # 24 hour time format
 CAL_ITEMS_REQUIRED = 3
+ANKI_REVIEWS_REQUIRED = 20
 
 BASE_DIR = Path(__file__).parent
 ENV_PATH = BASE_DIR / ".env"
@@ -58,6 +60,7 @@ DEBUG_MODE: bool = False # Set to False in production
 
 ALL_NOTION_TASKS_SORTED: bool = False
 ADEQUATE_GOOGLE_CAL_TASKS_SCHEDULED: bool = False
+ADEQUATE_ANKI_REVIEWS: bool = False
 
 
 def notify(title, message):
@@ -202,10 +205,57 @@ def first_time_in_day_running_script() -> bool:
 
 
 
+def adequate_anki_reviews_done() -> bool:
+    if ADEQUATE_ANKI_REVIEWS:
+        return True
+
+    anki_db_path_str = os.getenv("ANKI_DB_PATH")
+    if anki_db_path_str:
+        anki_db_path = Path(anki_db_path_str)
+    else:
+        anki_db_path = Path(os.environ.get("APPDATA", "")) / "Anki2" / "User 1" / "collection.anki2"
+
+    if not anki_db_path.exists():
+        notify(
+            title="Anki database not found",
+            message=f"Could not find Anki DB at {anki_db_path}. Set ANKI_DB_PATH in .env.",
+        )
+        return False
+
+    today_start_ms = int(datetime.combine(TODAY, time.min).timestamp() * 1000)
+    today_end_ms   = int(datetime.combine(TODAY, time.max).timestamp() * 1000)
+
+    try:
+        con = sqlite3.connect(f"file:{anki_db_path}?mode=ro", uri=True)
+        cur = con.cursor()
+        cur.execute(
+            "SELECT COUNT(*) FROM revlog WHERE id >= ? AND id <= ?",
+            (today_start_ms, today_end_ms),
+        )
+        count = cur.fetchone()[0]
+        con.close()
+    except sqlite3.OperationalError as e:
+        notify(
+            title="Failed to query Anki database",
+            message=f"{e}",
+        )
+        return False
+
+    if count >= ANKI_REVIEWS_REQUIRED:
+        return True
+
+    notify(
+        title="Review Anki flashcards",
+        message=f"You have reviewed {count}/{ANKI_REVIEWS_REQUIRED} flashcards today.",
+    )
+    return False
+
+
 def check_exit_requirements() -> None:
     exit_requirements = [
         no_notion_tasks_to_sort,
-        adequate_google_cal_tasks_scheduled
+        adequate_google_cal_tasks_scheduled,
+        adequate_anki_reviews_done,
     ]
 
     if all(req() for req in exit_requirements):
