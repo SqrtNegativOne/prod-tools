@@ -7,7 +7,6 @@ import wmi
 import threading
 from datetime import datetime, time
 from time import sleep
-from notion_client import Client as NotionClient
 from pathlib import Path
 
 import pythoncom
@@ -65,60 +64,6 @@ ADEQUATE_ANKI_REVIEWS: bool = False
 
 def notify(title, message):
     notif(title=title, message=message, logger=logger)
-
-def no_notion_tasks_to_sort() -> bool:
-    if ALL_NOTION_TASKS_SORTED: # Means we have already checked this before; no need to make another API call
-        return True
-    # Else, we have to check.
-
-    NOTION_KEY = os.getenv("NOTION_KEY")
-    if not NOTION_KEY:
-        raise ValueError("NOTION_KEY environment variable is not set.")
-    
-    NOTION_TASKS_DATABASE_ID = os.getenv("NOTION_TASKS_DATABASE_ID")
-    if not NOTION_TASKS_DATABASE_ID:
-        raise ValueError("NOTION_TASKS_DATABASE_ID environment variable is not set.")
-
-    notion = NotionClient(auth=NOTION_KEY)
-    response = notion.databases.query(
-        database_id=NOTION_TASKS_DATABASE_ID,
-        filter={
-            "and": [
-                {"property": "Status", "status": {"equals": "Todo"}},
-                {"property": "Expected ROI", "select": {"is_empty": True}},
-                {"property": "Scheduled", "date": {"is_empty": True}}
-            ]
-        }
-    )
-    try:
-        to_sort_tasks = response.get("results", None) # type: ignore
-    except Exception as e:
-        notify(
-            title="Failed to query Notion database",
-            message=f"{e}",
-        )
-        raise ValueError(f"Failed to query Notion database: {e}")
-    if to_sort_tasks is None:
-        notify(
-            title="Failed to retrieve tasks from Notion",
-            message=f"Check your database ID and API key.",
-        )
-        raise ValueError("Failed to retrieve tasks from Notion. Check your database ID and API key.")
-    if not isinstance(to_sort_tasks, list):
-        notify(
-            title="Unexpected response from Notion",
-            message=f"Expected a list of tasks, got {type(to_sort_tasks)}.",
-        )
-        raise ValueError(f"Unexpected response from Notion: expected a list, got {type(to_sort_tasks)}.")
-    
-    if len(to_sort_tasks) == 0:
-        return True
-    
-    notify(
-        title="Sort tasks in Notion",
-        message=f"You have {len(to_sort_tasks)} tasks to sort.",
-    )
-    return False
 
 def get_credentials():
     creds = None
@@ -253,7 +198,6 @@ def adequate_anki_reviews_done() -> bool:
 
 def check_exit_requirements() -> None:
     exit_requirements = [
-        no_notion_tasks_to_sort,
         adequate_google_cal_tasks_scheduled,
         adequate_anki_reviews_done,
     ]
@@ -298,18 +242,26 @@ def monitor_apps():
     
         sleep(1)
 
-if __name__ == '__main__':
+def main():
     # if datetime.today().weekday() not in (5, 6): # saturday sunday
     #     logger.info("It's a weekday; exiting.")
     #     sys.exit(0)
+
     if not first_time_in_day_running_script():
         logger.info("Script has already run today; exiting.")
         sys.exit(0)
+
     if not DEBUG_MODE and not (DONT_TRY_BEFORE_THIS_HOUR <= datetime.now().hour < GIVE_UP_AFTER_THIS_HOUR):
         logger.info("It's either too early or too late; exiting.")
         sys.exit(0)
+
+    logger.info("Starting monitor_apps daemon.")
+    threading.Thread(target=monitor_apps, daemon=True).start()
+    threading.Event().wait()  # Keep main thread alive
+
+if __name__ == '__main__':
+    logger.info("App blocker started.")
     try:
-        threading.Thread(target=monitor_apps, daemon=True).start()
-        threading.Event().wait()  # Keep main thread alive
+        main()
     except Exception as e:
-        logger.exception(f"An error occurred in the main thread: {e}")
+        logger.exception(f"An error occurred in the main function: {e}")
