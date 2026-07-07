@@ -20,7 +20,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from loguru import logger
-LOG_PATH = Path(__file__).parent.parent / 'log' / 'app_blocker.log'
+LOG_PATH = Path(__file__).parent.parent / 'logs' / 'app_blocker.log'
 logger.add(LOG_PATH)
 
 GIVE_UP_AFTER_THIS_HOUR   = 13 # 24 hour time format
@@ -34,7 +34,7 @@ SECRETS_DIR = BASE_DIR.parent / "secrets"
 CREDENTIALS_PATH = SECRETS_DIR / "credentials.json"
 TOKENS_PATH = SECRETS_DIR / "token.json"
 
-LAST_TIME_OPENED_FILE_PATH = BASE_DIR.parent / 'log' / 'last.txt'
+LAST_TIME_OPENED_FILE_PATH = BASE_DIR.parent / 'logs' / 'last.txt'
 
 load_dotenv(ENV_PATH)
 CALENDAR_ID: str = os.getenv('CALENDAR_ID', '')
@@ -135,18 +135,15 @@ def save_time() -> None:
     with open(LAST_TIME_OPENED_FILE_PATH, 'w') as f:
         f.writelines(formatted)
 
-def first_time_in_day_running_script() -> bool:
+def already_completed_today() -> bool:
     if not LAST_TIME_OPENED_FILE_PATH.exists():
-        save_time()
-        return True
+        return False
 
     with open(LAST_TIME_OPENED_FILE_PATH, 'r') as f:
         last_day_string = f.readline().strip()
 
     current_day_string = datetime.now().strftime(TIME_FORMAT)
-    save_time()
-
-    return last_day_string != current_day_string
+    return last_day_string == current_day_string
 
 
 
@@ -204,6 +201,7 @@ def check_exit_requirements() -> None:
 
     if all(req() for req in exit_requirements):
         logger.info('Requirements satisfied; killing app blocker.')
+        save_time()
         sys.exit(0)
 
 def monitor_apps():
@@ -247,8 +245,8 @@ def main():
     #     logger.info("It's a weekday; exiting.")
     #     sys.exit(0)
 
-    if not first_time_in_day_running_script():
-        logger.info("Script has already run today; exiting.")
+    if already_completed_today():
+        logger.info("Requirements were already met earlier today; exiting.")
         sys.exit(0)
 
     if not DEBUG_MODE and not (DONT_TRY_BEFORE_THIS_HOUR <= datetime.now().hour < GIVE_UP_AFTER_THIS_HOUR):

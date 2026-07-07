@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from loguru import logger
+import psutil
 
 import tomli as tomllib
 
@@ -19,9 +20,11 @@ import tomli as tomllib
 # Config
 # ---------------------------------------------------------------------------
 
-_TOML_PATH = Path(__file__).parent.parent / "input" / "watchdawg.toml"
-_LOG_DIR = Path(__file__).parent.parent / "logs"
-
+SRC_DIR = Path(__file__).parent
+ROOT_DIR = SRC_DIR.parent
+_TOML_PATH = ROOT_DIR / "input" / "watchdawg.toml"
+_LOG_DIR = ROOT_DIR / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
 logger.add(_LOG_DIR / "watchdawg.log", rotation="1 week", retention=2)
 log = logger
 
@@ -62,13 +65,15 @@ def load_config(toml_path: Path) -> tuple[int, int, list[AppConfig]]:
 # ---------------------------------------------------------------------------
 
 def is_running(process_name: str) -> bool:
-    """Return True if a process with process_name is in the task list."""
-    result = subprocess.run(
-        ["tasklist", "/FI", f"IMAGENAME eq {process_name}", "/NH"],
-        capture_output=True, text=True,
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    )
-    return process_name.lower() in result.stdout.lower()
+    """Return True if a process with process_name is running."""
+    target = process_name.lower()
+    for p in psutil.process_iter(['name']):
+        try:
+            if p.info['name'] and p.info['name'].lower() == target:
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+    return False
 
 
 def launch(app: AppConfig) -> None:
@@ -87,6 +92,10 @@ def launch(app: AppConfig) -> None:
 def main() -> None:
     log.info("Watchdawg initializing.")
 
+    if not _TOML_PATH.exists():
+        log.error("Config not found: %s", _TOML_PATH)
+        return
+
     check_interval, initial_delay, apps = load_config(_TOML_PATH)
 
     log.info("Watchdawg started. Monitoring: %s", ", ".join(a.process_name for a in apps))
@@ -97,20 +106,23 @@ def main() -> None:
     log.info("Watchdawg entering main loop.")
 
     while True:
-        for app in apps:
-            if is_running(app.process_name):
-                log.debug("%s is running.", app.process_name)
-                continue
+        try:
+            for app in apps:
+                if is_running(app.process_name):
+                    log.debug(f"{app.process_name} is running.")
+                    continue
 
-            log.info(
-                "%s not running. Waiting %ds before relaunch.",
-                app.process_name, app.relaunch_delay_sec,
-            )
-            time.sleep(app.relaunch_delay_sec)
-            if not is_running(app.process_name):
-                launch(app)
-        
-        time.sleep(check_interval)
+                log.info(
+                    f"{app.process_name} not running. Waiting {app.relaunch_delay_sec}s before relaunch."
+                )
+                time.sleep(app.relaunch_delay_sec)
+                if not is_running(app.process_name):
+                    launch(app)
+            
+            time.sleep(check_interval)
+        except Exception as e:
+            log.exception(f"Unhandled exception in watchdawg main loop: {e}")
+            time.sleep(60) # Prevent tight crash loops
 
 
 if __name__ == "__main__":
